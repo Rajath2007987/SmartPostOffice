@@ -10,4 +10,5 @@ setuptools>=68.0.0
 wheel
 boto3==1.26.162
 twilio==8.10.0
+waitress==2.1.2
 

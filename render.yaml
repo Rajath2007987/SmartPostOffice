@@ -5,6 +5,6 @@ services:
     region: oregon
     branch: main
     buildCommand: "python -m pip install -U pip setuptools wheel && python -m pip install -r requirements.txt"
-    startCommand: "python -m pip install -U setuptools wheel && python -m gunicorn wsgi:app"
+    startCommand: "python -m pip install -U --force-reinstall setuptools wheel packaging && python -m gunicorn wsgi:app"
     autoDeploy: true
     healthCheckPath: "/"

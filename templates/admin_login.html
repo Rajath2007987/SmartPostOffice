@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login - Smart Post Office</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container" style="max-width: 400px;">
+    <h2>🔐 Admin Login</h2>
+    <p class="description">Secure access to admin panel</p>
+
+    <input id="username" type="text" placeholder="👤 Username" required>
+    <input id="password" type="password" placeholder="🔑 Password" required>
+
+    <button onclick="login()">Login</button>
+
+    <div id="msg" class="message"></div>
+
+    <script>
+    function login() {
+      const msg = document.getElementById('msg');
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      if (!username || !password) {
+        msg.innerText = "❌ Username and password required!";
+        msg.classList.add('show', 'error');
+        return;
+      }
+
+      fetch("/admin_login", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ username, password })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          msg.innerText = "❌ " + data.error;
+          msg.classList.remove('success');
+          msg.classList.add('show', 'error');
+        } else {
+          msg.innerText = "✅ " + data.message;
+          msg.classList.remove('error');
+          msg.classList.add('show', 'success');
+          setTimeout(() => window.location.href = '/admin', 1500);
+        }
+      })
+      .catch(err => {
+        msg.innerText = "❌ Error: " + err.message;
+        msg.classList.remove('success');
+        msg.classList.add('show', 'error');
+      });
+    }
+
+    // Allow Enter key
+    document.getElementById('password').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') login();
+    });
+    </script>
+  </div>
+</body>
+</html>

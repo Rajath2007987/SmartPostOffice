@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pay - Smart Post Office</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container" style="max-width: 520px;">
+    <h2>💳 Pay for Parcel</h2>
+
+    {% if error %}
+      <div style="color: #721c24; background: #f8d7da; padding: 12px; border-radius: 6px; border: 1px solid #f5c6cb; margin-top: 15px;">
+        ❌ {{ error }}
+      </div>
+      <div style="margin-top: 16px;">
+        <a href="/" style="display: inline-block;">← Back to Home</a>
+      </div>
+    {% else %}
+      <p class="description" style="margin-bottom: 8px;">Tracking: <strong>{{ tracking }}</strong></p>
+      <p class="description" style="margin-top: 0;">Amount: <strong>₹{{ '%.2f' % amount }}</strong></p>
+
+      <div
+        id="payCtx"
+        data-tracking="{{ tracking | e }}"
+        data-key-id="{{ key_id | e }}"
+        data-email="{{ (email or '') | e }}"
+        data-phone="{{ (phone or '') | e }}"
+        style="display:none;"
+      ></div>
+
+      <button id="payBtn" style="margin-top: 16px;">Pay with Razorpay</button>
+      <div id="msg" class="message" style="margin-top: 14px;"></div>
+
+      <div style="margin-top: 16px;">
+        <a href="/track?code={{ tracking }}" style="display: inline-block;">← Back to Tracking</a>
+      </div>
+
+      <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+      <script>
+        const payCtx = document.getElementById('payCtx');
+        const tracking = (payCtx && payCtx.dataset && payCtx.dataset.tracking) ? payCtx.dataset.tracking : '';
+        const keyId = (payCtx && payCtx.dataset && payCtx.dataset.keyId) ? payCtx.dataset.keyId : '';
+        const email = (payCtx && payCtx.dataset && payCtx.dataset.email) ? payCtx.dataset.email : '';
+        const phone = (payCtx && payCtx.dataset && payCtx.dataset.phone) ? payCtx.dataset.phone : '';
+
+        const msg = document.getElementById('msg');
+        const btn = document.getElementById('payBtn');
+
+        function setMsg(text, kind) {
+          msg.classList.remove('show', 'success', 'error');
+          msg.innerText = text;
+          msg.classList.add('show');
+          if (kind) msg.classList.add(kind);
+        }
+
+        async function startPayment() {
+          try {
+            btn.disabled = true;
+            setMsg('Creating order…');
+
+            const orderRes = await fetch('/create_razorpay_order', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tracking })
+            });
+            const orderData = await orderRes.json();
+            if (!orderRes.ok) {
+              throw new Error(orderData.error || 'Failed to create order');
+            }
+
+            const options = {
+              key: keyId,
+              amount: orderData.amount,
+              currency: orderData.currency,
+              name: 'Smart Post Office',
+              description: `Payment for parcel ${tracking}`,
+              order_id: orderData.order_id,
+              prefill: { email, contact: phone },
+              handler: async function (response) {
+                try {
+                  setMsg('Verifying payment…');
+                  const verifyRes = await fetch('/verify_payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      tracking,
+                      razorpay_payment_id: response.razorpay_payment_id,
+                      razorpay_order_id: response.razorpay_order_id,
+                      razorpay_signature: response.razorpay_signature
+                    })
+                  });
+                  const verifyData = await verifyRes.json();
+                  if (!verifyRes.ok) {
+                    throw new Error(verifyData.error || 'Verification failed');
+                  }
+                  setMsg(verifyData.message || '✅ Payment successful', 'success');
+                } catch (e) {
+                  setMsg('❌ ' + (e && e.message ? e.message : 'Verification error'), 'error');
+                } finally {
+                  btn.disabled = false;
+                }
+              },
+              theme: { color: '#667eea' }
+            };
+
+            setMsg('Opening Razorpay…');
+            const rzp = new Razorpay(options);
+            rzp.on('payment.failed', function (response) {
+              setMsg('❌ Payment failed. Try again.', 'error');
+              btn.disabled = false;
+            });
+            rzp.open();
+          } catch (e) {
+            setMsg('❌ ' + (e && e.message ? e.message : 'Payment init error'), 'error');
+            btn.disabled = false;
+          }
+        }
+
+        btn.addEventListener('click', startPayment);
+      </script>
+    {% endif %}
+  </div>
+</body>
+</html>

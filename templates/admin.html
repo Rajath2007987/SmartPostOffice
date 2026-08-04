@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Smart Post Office</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h2>⚙️ Admin Panel</h2>
+      <div>
+        <a href="/admin_dashboard" style="margin-right: 10px; width: auto; padding: 8px 16px;">📊 Dashboard</a>
+        <a href="/admin_logout" style="width: auto; padding: 8px 16px; background: #dc3545;">Logout</a>
+      </div>
+    </div>
+    <p class="description">Create & manage parcel shipments</p>
+
+    <h3>Basic Information</h3>
+    <input id="tracking" type="text" placeholder="📮 Tracking Number (e.g., EM123456789IN)" required>
+    <input id="parcelStatus" type="text" placeholder="📊 Parcel Status (In Transit / Delivered / Pending)" required>
+    <input id="city" type="text" placeholder="🏙️ Current City" required>
+    
+    <h3>Customer Details</h3>
+    <input id="phone" type="tel" placeholder="📱 Customer Mobile Number" required>
+    <input id="email" type="email" placeholder="📧 Customer Email (optional)">
+    <input id="sender_name" type="text" placeholder="👤 Sender Name">
+    
+    <h3>Shipment Details</h3>
+    <input id="weight" type="text" placeholder="⚖️ Weight (e.g., 2.5 kg)">
+    <input id="price" type="number" placeholder="💰 Shipping Price (₹)" step="0.01" value="0">
+
+    <button onclick="updateParcel()">✅ Create/Update Parcel</button>
+
+    <div id="msg" class="message"></div>
+
+    <hr style="margin: 20px 0; border: none; border-top: 1px solid #e0e0e0;">
+    
+    <h3>Quick Actions</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+      <a href="/admin_dashboard" style="text-align: center;">📊 View Dashboard</a>
+      <a href="/analytics" style="text-align: center;">📈 Analytics</a>
+      <a href="/export_csv" style="text-align: center;">📥 Export CSV</a>
+      <a href="/" style="text-align: center;">🏠 Home</a>
+    </div>
+
+    <script>
+    function updateParcel() {
+      const msg = document.getElementById('msg');
+      const tracking = document.getElementById('tracking').value.trim();
+      const parcelStatus = document.getElementById('parcelStatus').value.trim();
+      const city = document.getElementById('city').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const sender_name = document.getElementById('sender_name').value.trim();
+      const weight = document.getElementById('weight').value.trim();
+      const price = parseFloat(document.getElementById('price').value) || 0;
+
+      if (!tracking || !parcelStatus || !city || !phone) {
+        msg.innerText = "❌ Tracking, Status, City, and Phone are required!";
+        msg.classList.add('show', 'error');
+        return;
+      }
+
+      fetch("/admin", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          tracking, parcelStatus, city, phone, email, sender_name, weight, price
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          msg.innerText = "❌ " + data.error;
+          msg.classList.remove('success');
+          msg.classList.add('show', 'error');
+        } else {
+          msg.innerText = "✅ " + data.message;
+          msg.classList.remove('error');
+          msg.classList.add('show', 'success');
+          // Clear form
+          document.getElementById('tracking').value = '';
+          document.getElementById('parcelStatus').value = '';
+          document.getElementById('city').value = '';
+          document.getElementById('phone').value = '';
+          document.getElementById('email').value = '';
+          document.getElementById('sender_name').value = '';
+          document.getElementById('weight').value = '';
+          document.getElementById('price').value = '0';
+        }
+      })
+      .catch(err => {
+        msg.innerText = "❌ Error: " + err.message;
+        msg.classList.remove('success');
+        msg.classList.add('show', 'error');
+      });
+    }
+    </script>
+  </div>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Track Parcel - Smart Post Office</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .parcel-details {
+      background: #f8f9fa;
+      border-radius: 6px;
+      border-left: 4px solid #667eea;
+      padding: 15px;
+      margin-top: 20px;
+    }
+    .parcel-details p {
+      margin: 10px 0;
+      line-height: 1.6;
+    }
+    .parcel-details strong {
+      color: #333;
+      display: inline-block;
+      width: 120px;
+    }
+    .qr-section {
+      text-align: center;
+      margin-top: 20px;
+      padding: 20px;
+      background: white;
+      border-radius: 6px;
+    }
+    .qr-section img {
+      width: 200px;
+      height: 200px;
+    }
+    .timeline {
+      margin-top: 20px;
+      padding: 15px;
+      background: white;
+      border-radius: 6px;
+      border-left: 4px solid #764ba2;
+    }
+    .timeline h3 {
+      margin-top: 0;
+      color: #764ba2;
+    }
+    .timeline-item {
+      padding: 10px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .timeline-item:last-child {
+      border-bottom: none;
+    }
+    .timeline-date {
+      font-size: 12px;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🔍 Track Your Parcel</h2>
+    <p class="description">Enter your tracking number to get real-time updates</p>
+
+    <input id="tno" type="text" placeholder="📮 Enter Tracking Number (e.g., EM123456789IN)" value="{{ (code or '') | e }}" required>
+    <button onclick="trackParcel()">Search</button>
+
+    <div id="result"></div>
+    <div id="qrSection"></div>
+    <div id="timelineSection"></div>
+
+    <iframe id="map" width="100%" height="300" style="margin-top: 20px; display: none;"></iframe>
+
+    <script>
+    function trackParcel() {
+      const tno = document.getElementById('tno').value.trim();
+      const result = document.getElementById('result');
+      const qrSection = document.getElementById('qrSection');
+      const timelineSection = document.getElementById('timelineSection');
+      const map = document.getElementById('map');
+
+      result.innerHTML = '';
+      qrSection.innerHTML = '';
+      timelineSection.innerHTML = '';
+      map.style.display = 'none';
+
+      if (!tno) {
+        result.innerHTML = "<div style='color: #721c24; background: #f8d7da; padding: 12px; border-radius: 6px; border: 1px solid #f5c6cb;'>❌ Please enter a tracking number</div>";
+        return;
+      }
+
+      fetch("/getparcel/" + encodeURIComponent(tno))
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          result.innerHTML = "<div style='color: #721c24; background: #f8d7da; padding: 12px; border-radius: 6px; border: 1px solid #f5c6cb;'>❌ Tracking number not found</div>";
+        } else {
+          // Display parcel details
+          result.innerHTML = `
+            <div class="parcel-details">
+              <p><strong>📦 Tracking:</strong> ${tno}</p>
+              <p><strong>📊 Status:</strong> <span style='color: #667eea; font-weight: 600;'>${data.parcelStatus}</span></p>
+              <p><strong>🏙️ Location:</strong> ${data.city}</p>
+              <p><strong>👤 Sender:</strong> ${data.sender_name || '-'}</p>
+              <p><strong>⚖️ Weight:</strong> ${data.weight || '-'}</p>
+              <p><strong>💰 Price:</strong> ₹${data.price || '0'}</p>
+              <p><strong>📅 Created:</strong> ${data.created_at}</p>
+              <div style="margin-top: 14px;">
+                <a href="/pay?tracking=${encodeURIComponent(tno)}" target="_blank" rel="noopener" style="display: inline-block; background: #28a745; color: white; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: 600;">Pay Now →</a>
+              </div>
+            </div>
+          `;
+          
+          // Display both Tracking QR + Payment QR
+          qrSection.innerHTML = `
+            <div class="qr-section">
+              <h3>📦 Tracking QR</h3>
+              <p style="margin-top: 0; color: #666; font-size: 12px;">Scan to open tracking page</p>
+              <img src="/qrcode_track/${tno}" alt="Tracking QR">
+              <div style="margin-top: 12px;">
+                <a href="/track?code=${encodeURIComponent(tno)}" target="_blank" rel="noopener">Open tracking page →</a>
+              </div>
+            </div>
+
+            <div class="qr-section" style="margin-top: 14px;">
+              <h3>💳 Payment QR</h3>
+              <p style="margin-top: 0; color: #666; font-size: 12px;">Scan to open payment page</p>
+              <img src="/qrcode_pay/${tno}" alt="Payment QR">
+              <div style="margin-top: 12px;">
+                <a href="/pay?tracking=${encodeURIComponent(tno)}" target="_blank" rel="noopener">Open payment page →</a>
+              </div>
+            </div>
+          `;
+          
+          // Display map
+          map.src = "https://maps.google.com/maps?q=" + encodeURIComponent(data.city) + "&output=embed";
+          map.style.display = 'block';
+          
+          // Load history
+          loadHistory(tno, timelineSection);
+        }
+      })
+      .catch(err => {
+        result.innerHTML = "<div style='color: #721c24; background: #f8d7da; padding: 12px; border-radius: 6px; border: 1px solid #f5c6cb;'>❌ Error: " + err.message + "</div>";
+      });
+    }
+
+    function loadHistory(tracking, container) {
+      fetch(`/parcel_history/${tracking}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.history && data.history.length > 0) {
+          // History comes from server newest-first; reverse to show chronological order
+          const items = data.history.slice().reverse();
+
+          function formatDuration(ms) {
+            const sec = Math.floor(ms / 1000);
+            if (sec < 60) return sec + 's';
+            const min = Math.floor(sec / 60);
+            if (min < 60) return min + 'm';
+            const hr = Math.floor(min / 60);
+            if (hr < 24) return hr + 'h ' + (min % 60) + 'm';
+            const days = Math.floor(hr / 24);
+            return days + 'd ' + (hr % 24) + 'h';
+          }
+
+          let timeline = '<div class="timeline"><h3>📍 Journey Timeline</h3>';
+
+          // Show current status badge (from latest entry)
+          const latest = data.history[0];
+          timeline += `<div style="margin-bottom:12px;"><strong>Current status:</strong> <span style="color: #fff; background:${latest.status.toLowerCase().includes('deliv') ? '#28a745' : latest.status.toLowerCase().includes('pend') ? '#ffc107' : '#667eea'}; padding:4px 8px; border-radius:4px; font-weight:700;">${latest.status}</span> <span style="color:#666; margin-left:10px;">${latest.timestamp}</span></div>`;
+
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            timeline += `
+              <div class="timeline-item">
+                <strong>${item.status}</strong> - ${item.city || '-'}
+                <div class="timeline-date">${item.timestamp}</div>
+              </div>
+            `;
+
+            // show how long this status lasted until the next event
+            if (i < items.length - 1) {
+              const cur = new Date(item.timestamp);
+              const next = new Date(items[i+1].timestamp);
+              const diff = next - cur;
+              if (!isNaN(diff) && diff > 0) {
+                timeline += `<div style="padding:6px 0 12px 0; color:#555; font-size:13px;">Stayed for <strong>${formatDuration(diff)}</strong> before <strong>${items[i+1].status}</strong></div>`;
+              }
+            }
+          }
+
+          timeline += '</div>';
+          container.innerHTML = timeline;
+        } else {
+          container.innerHTML = '<div class="timeline"><h3>📍 Journey Timeline</h3><div style="color:#666;">No history available for this tracking number.</div></div>';
+        }
+      });
+    }
+
+    // Allow Enter key
+    document.getElementById('tno').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') trackParcel();
+    });
+
+    // If opened via QR code (e.g. /track?code=ABC123), auto-run the search.
+    window.addEventListener('DOMContentLoaded', () => {
+      const initial = document.getElementById('tno').value.trim();
+      if (initial) trackParcel();
+    });
+    </script>
+  </div>
+</body>
+</html>

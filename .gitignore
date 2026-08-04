@@ -1,0 +1,7 @@
+.env
+.venv/
+parcels.db
+app.log
+__pycache__/
+*.pyc
+.DS_Store

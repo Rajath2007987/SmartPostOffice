@@ -16,7 +16,13 @@ def ensure_pkg():
 
 def main():
     ensure_pkg()
-    # exec gunicorn with same interpreter so paths match
+    # On Windows, Gunicorn imports `fcntl` (POSIX-only) and will fail.
+    # Use the Flask dev server locally on Windows to avoid the error.
+    if sys.platform.startswith("win") or os.name == "nt":
+        print("Detected Windows: falling back to Flask dev server (use WSL/Docker for production-like testing).")
+        os.execvp(sys.executable, [sys.executable, "app.py"])
+
+    # exec gunicorn with same interpreter so paths match (Linux/Render)
     os.execvp(sys.executable, [sys.executable, "-m", "gunicorn", "wsgi:app"]) 
 
 if __name__ == '__main__':

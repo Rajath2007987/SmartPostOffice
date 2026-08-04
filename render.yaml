@@ -4,7 +4,7 @@ services:
     env: python
     region: oregon
     branch: main
-    buildCommand: "python -m pip install -U pip setuptools wheel && python -m pip install -r requirements.txt"
+    buildCommand: "python -m pip install -U pip && python -m pip install -U --force-reinstall setuptools wheel packaging && python -m pip install -r requirements.txt --no-cache-dir"
     startCommand: "python start_gunicorn.py"
     autoDeploy: true
     healthCheckPath: "/"

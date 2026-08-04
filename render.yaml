@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: SmartPostOffice
+    env: python
+    region: oregon
+    branch: main
+    buildCommand: "pip install -U pip setuptools wheel && pip install -r requirements.txt"
+    startCommand: "gunicorn wsgi:app"
+    autoDeploy: true
+    healthCheckPath: "/"

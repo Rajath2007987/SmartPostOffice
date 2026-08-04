@@ -6,6 +6,7 @@ qrcode==8.2
 Pillow==12.0.0
 requests==2.31.0
 gunicorn==20.1.0
+setuptools
 boto3==1.26.162
 twilio==8.10.0
 
